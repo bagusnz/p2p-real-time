@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ScalaCompilerConfiguration">
+    <profile name="sbt 1" modules="repo_1690" />
+    <profile name="sbt 2" modules="Masterarbeit Bagus Nanda,P2P Real-Time">
+      <parameters>
+        <parameter value="-Ymacro-annotations" />
+      </parameters>
+      <plugins>
+        <plugin path="$USER_HOME$/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-js/scalajs-compiler_2.13.7/1.11.0/scalajs-compiler_2.13.7-1.11.0.jar" />
+      </plugins>
+    </profile>
+  </component>
+</project>
