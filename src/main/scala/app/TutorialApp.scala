@@ -4,11 +4,10 @@ import loci.registry.Registry
 import org.scalajs.dom
 import org.scalajs.dom.{CanvasRenderingContext2D, document}
 import org.scalajs.dom.html.{Canvas, Div, Image}
-import rescala.default._
-import rescala.extra.lattices.sequences.RGA
-import rescala.extra.lattices.sequences.RGA.RGA
-import scalatags.JsDom.all._
-import app.Codecs._
+import rescala.default.*
+import scalatags.JsDom.all.*
+import app.Codecs.*
+import kofre.datatypes.RGA
 
 import scala.util.Random
 
@@ -55,11 +54,11 @@ object TutorialApp {
       divCanvas
     ).render
 
-    val connectedPeers = Evt[Peer]
+    val connectedPeers = Evt[Peer]()
 
-    val peers: Signal[RGA[Peer]] = Storing.storedAs("peers", RGA.empty[Peer]){ init =>
+    val peers: Signal[Set[Peer]] = Storing.storedAs("peers", Set.empty[Peer]){ init =>
       connectedPeers.fold(init) { (current, peer) =>
-        current.prepend(peer)
+        current + peer
       }
     }
 

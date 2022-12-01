@@ -2,27 +2,33 @@ enablePlugins(ScalaJSPlugin)
 
 name := "P2P Real-Time"
 
-scalaVersion := "2.13.7"
-resolvers += ("STG old bintray repo" at "http://www.st.informatik.tu-darmstadt.de/maven/").withAllowInsecureProtocol(true)
+scalaVersion := "3.2.1"
+
+// used for rescala & loci snapshots
+resolvers += "jitpack" at "https://jitpack.io"
 
 scalacOptions += "-Ymacro-annotations"
 
-libraryDependencies += "de.tuda.stg" %%% "rescala" % "0.30.0"
-libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "2.3.0"
-libraryDependencies += "com.lihaoyi" %%% "scalatags" % "0.12.0"
 libraryDependencies ++= Seq(
-  "io.github.scala-loci" %%% "scala-loci-language" % "0.5.0" % "compile-internal",
-  "io.github.scala-loci" %%% "scala-loci-language-runtime" % "0.5.0")
+  "com.github.rescala-lang.rescala" %%% "rescala" % "d5c1215bc2",
+  "com.github.rescala-lang.rescala" %%% "kofre"   % "d5c1215bc2"
+)
+libraryDependencies += "org.scala-js" %%% "scalajs-dom" % "2.3.0"
+libraryDependencies += "com.lihaoyi"  %%% "scalatags"   % "0.12.0"
+//libraryDependencies ++= Seq(
+//  "com.github.scala-loci.scala-loci" %%% "scala-loci-language"         % "03ddfb7ca9" % "compile-internal",
+//  "com.github.scala-loci.scala-loci" %%% "scala-loci-language-runtime" % "03ddfb7ca9"
+//)
 
-libraryDependencies += "io.github.scala-loci" %%% "scala-loci-language-transmitter-rescala" % "0.5.0"
-libraryDependencies += "io.github.scala-loci" %%% "scala-loci-communicator-webrtc" % "0.5.0"
-libraryDependencies += "io.github.scala-loci" %%% "scala-loci-serializer-jsoniter-scala" % "0.5.0"
+libraryDependencies ++= Seq(
+  "com.github.scala-loci.scala-loci" %%% "scala-loci-communicator-webrtc" % "03ddfb7ca9"
+)
 
 libraryDependencies ++= Seq(
   // Use the %%% operator instead of %% for Scala.js and Scala Native
-  "com.github.plokhotnyuk.jsoniter-scala" %%% "jsoniter-scala-core"   % "2.17.9",
+  "com.github.plokhotnyuk.jsoniter-scala" %%% "jsoniter-scala-core" % "2.18.1",
   // Use the "provided" scope instead when the "compile-internal" scope is not supported
-  "com.github.plokhotnyuk.jsoniter-scala" %%% "jsoniter-scala-macros" % "2.17.9"
+  "com.github.plokhotnyuk.jsoniter-scala" %%% "jsoniter-scala-macros" % "2.18.1"
 )
 
 // This is an application with a main method
