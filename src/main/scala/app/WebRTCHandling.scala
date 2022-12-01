@@ -14,7 +14,7 @@ import loci.communicator.webrtc.WebRTC.ConnectorFactory
 
 import scala.concurrent.{Future, Promise}
 
-case class WebRTCHandling(registry: Registry, id: Int) {
+case class WebRTCHandling(registry: Registry, peerId: String) {
 
   val codec: JsonValueCodec[webrtc.WebRTC.CompleteSession] = JsonCodecMaker.make
 

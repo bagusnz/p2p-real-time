@@ -1,21 +1,27 @@
 package app
 
-import loci.registry.{Registry, Binding}
+import loci.registry.{Binding, Registry}
 import org.scalajs.dom
 import org.scalajs.dom.{CanvasRenderingContext2D, document}
 import org.scalajs.dom.html.{Canvas, Div, Image}
 import rescala.default.*
 import scalatags.JsDom.all.*
 import app.Codecs.*
-import kofre.datatypes.RGA
+import kofre.datatypes.{AddWinsSet, RGA}
 import rescala.extra.distribution.Network
+import kofre.decompose.containers.DeltaBufferRDT
+import kofre.syntax.DottedName
 
+import java.util.concurrent.ThreadLocalRandom
 import scala.util.Random
+
+import loci.serializer.Serializable.resolutionFailure
 
 case class Peer(left: String, right: String)
 
 object TutorialApp {
 
+  val peerId: String = ThreadLocalRandom.current().nextLong().toHexString
   val registry = new Registry
 
   def main(args: Array[String]): Unit = {
@@ -26,10 +32,6 @@ object TutorialApp {
 
   def setupUI(): Unit = {
 
-    val id = new Random().nextInt()
-    println(id)
-//    dom.window.localStorage.setItem("id", id.toString)
-
     val canvasElem = canvas(
       border := "1px solid red",
       width := "100%",
@@ -38,7 +40,7 @@ object TutorialApp {
 
     val divWebRTC = div(
       `class` := "row",
-      WebRTCHandling(registry, id).webrtcHandlingArea.render
+      WebRTCHandling(registry, peerId).webrtcHandlingArea.render
     ).render
 
     val divCanvas = div(
@@ -57,20 +59,22 @@ object TutorialApp {
 
     val connectedPeers = Evt[Peer]()
 
-    val peers: Signal[Set[Peer]] = Storing.storedAs("peers", Set.empty[Peer]){ init =>
+    val peers: Signal[DeltaBufferRDT[AddWinsSet[Peer]]] = Storing.storedAs("peers", DeltaBufferRDT( peerId, AddWinsSet.empty[Peer])){ init =>
       connectedPeers.fold(init) { (current, peer) =>
-        current + peer
+        // needs container, that's why using DeltaBufferRDT
+        current.add(peer)
       }
-    }
+    }(peerAddWinsSetCodec)
 
-//    Network.replicate(peers, registry)(Binding("peers"))
+    // No given instance of type kofre.base.Lattice[kofre.datatypes.AddWinsSet[app.Peer]] was found for an implicit parameter of method replicate in object Network
+    Network.replicate(peers, registry)(Binding("peers"))
 
     document.body.appendChild(gridElem)
     drawNetwork(canvasElem, divCanvas)
-    println(peers.now)
 
-    connectedPeers.fire(new Peer("testLeft3", "testRight2"))
-    println(peers.now)
+    connectedPeers.fire(new Peer("testLeft2", "testRight3"))
+    val contentPeers: Set[Peer] = peers.now.state.store.elements
+    contentPeers.foreach(x => println(x))
 
   }
 
