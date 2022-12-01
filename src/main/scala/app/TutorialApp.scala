@@ -1,6 +1,6 @@
 package app
 
-import loci.registry.Registry
+import loci.registry.{Registry, Binding}
 import org.scalajs.dom
 import org.scalajs.dom.{CanvasRenderingContext2D, document}
 import org.scalajs.dom.html.{Canvas, Div, Image}
@@ -8,6 +8,7 @@ import rescala.default.*
 import scalatags.JsDom.all.*
 import app.Codecs.*
 import kofre.datatypes.RGA
+import rescala.extra.distribution.Network
 
 import scala.util.Random
 
@@ -62,9 +63,14 @@ object TutorialApp {
       }
     }
 
+//    Network.replicate(peers, registry)(Binding("peers"))
+
     document.body.appendChild(gridElem)
     drawNetwork(canvasElem, divCanvas)
-    println(peers)
+    println(peers.now)
+
+    connectedPeers.fire(new Peer("testLeft3", "testRight2"))
+    println(peers.now)
 
   }
 
