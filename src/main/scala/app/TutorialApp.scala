@@ -7,21 +7,22 @@ import org.scalajs.dom.html.{Canvas, Div, Image}
 import rescala.default.*
 import scalatags.JsDom.all.*
 import app.Codecs.*
+import kofre.base.Defs
 import kofre.datatypes.{AddWinsSet, RGA}
 import rescala.extra.distribution.Network
 import kofre.decompose.containers.DeltaBufferRDT
+import kofre.dotted.Dotted
 import kofre.syntax.DottedName
 
 import java.util.concurrent.ThreadLocalRandom
 import scala.util.Random
-
 import loci.serializer.Serializable.resolutionFailure
 
 case class Peer(left: String, right: String)
 
 object TutorialApp {
 
-  val peerId: String = ThreadLocalRandom.current().nextLong().toHexString
+  val peerId = Defs.genId()
   val registry = new Registry
 
   def main(args: Array[String]): Unit = {
@@ -59,9 +60,8 @@ object TutorialApp {
 
     val connectedPeers = Evt[Peer]()
 
-    val peers: Signal[DeltaBufferRDT[AddWinsSet[Peer]]] = Storing.storedAs("peers", DeltaBufferRDT( peerId, AddWinsSet.empty[Peer])){ init =>
+    val peers: Signal[DottedName[AddWinsSet[Peer]]] = Storing.storedAs("peers", DottedName(peerId, Dotted(AddWinsSet.empty[Peer]))){ init =>
       connectedPeers.fold(init) { (current, peer) =>
-        // needs container, that's why using DeltaBufferRDT
         current.add(peer)
       }
     }(peerAddWinsSetCodec)
@@ -72,8 +72,8 @@ object TutorialApp {
     document.body.appendChild(gridElem)
     drawNetwork(canvasElem, divCanvas)
 
-    connectedPeers.fire(new Peer("testLeft2", "testRight3"))
-    val contentPeers: Set[Peer] = peers.now.state.store.elements
+    connectedPeers.fire(new Peer("testLeft4", "testRight3"))
+    val contentPeers: Set[Peer] = peers.now.anon.store.elements
     contentPeers.foreach(x => println(x))
 
   }

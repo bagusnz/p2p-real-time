@@ -5,8 +5,8 @@ import com.github.plokhotnyuk.jsoniter_scala.core.{JsonReader, JsonValueCodec, J
 import com.github.plokhotnyuk.jsoniter_scala.macros.{CodecMakerConfig, JsonCodecMaker}
 import kofre.datatypes.{AddWinsSet, RGA}
 import loci.transmitter.IdenticallyTransmittable
-import kofre.decompose.containers.DeltaBufferRDT
 import kofre.dotted.{DotSet, Dotted}
+import kofre.syntax.DottedName
 import sourcecode.Text.generate
 
 
@@ -17,15 +17,16 @@ object Codecs {
 //  implicit val peerSetTransmittable: IdenticallyTransmittable[Set[Peer]] = IdenticallyTransmittable()
 
   implicit val codecState: JsonValueCodec[Dotted[AddWinsSet[Peer]]] = JsonCodecMaker.make(CodecMakerConfig.withMapAsArray(true))
-  implicit val peerAddWinsSetCodec: JsonValueCodec[DeltaBufferRDT[AddWinsSet[Peer]]] =
-    new JsonValueCodec[DeltaBufferRDT[AddWinsSet[Peer]]]:
-      override def decodeValue(in: JsonReader, default: DeltaBufferRDT[AddWinsSet[Peer]]): DeltaBufferRDT[AddWinsSet[Peer]] = {
-        val state = codecState.decodeValue(in, default.state)
-        new DeltaBufferRDT[AddWinsSet[Peer]](state, peerId, List())
+
+  implicit val peerAddWinsSetCodec: JsonValueCodec[DottedName[AddWinsSet[Peer]]] =
+    new JsonValueCodec[DottedName[AddWinsSet[Peer]]]:
+      override def decodeValue(in: JsonReader, default: DottedName[AddWinsSet[Peer]]): DottedName[AddWinsSet[Peer]] = {
+        val state = codecState.decodeValue(in, default.anon)
+        new DottedName(peerId, state)
       }
 
-      override def encodeValue(x: DeltaBufferRDT[AddWinsSet[Peer]], out: JsonWriter): Unit = codecState.encodeValue(x.state, out)
+      override def encodeValue(x: DottedName[AddWinsSet[Peer]], out: JsonWriter): Unit = codecState.encodeValue(x.anon, out)
 
-      override def nullValue: DeltaBufferRDT[AddWinsSet[Peer]] = DeltaBufferRDT(peerId, AddWinsSet.empty[Peer])
+      override def nullValue: DottedName[AddWinsSet[Peer]] = DottedName(peerId, Dotted(AddWinsSet.empty[Peer]))
 
 }
