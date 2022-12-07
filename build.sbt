@@ -21,7 +21,8 @@ libraryDependencies += "com.lihaoyi"  %%% "scalatags"   % "0.12.0"
 //)
 
 libraryDependencies ++= Seq(
-  "com.github.scala-loci.scala-loci" %%% "scala-loci-communicator-webrtc" % "03ddfb7ca9"
+  "com.github.scala-loci.scala-loci" %%% "scala-loci-communicator-webrtc" % "03ddfb7ca9",
+  "com.github.scala-loci.scala-loci" %%% "scala-loci-serializer-jsoniter-scala" % "03ddfb7ca9"
 )
 
 libraryDependencies ++= Seq(

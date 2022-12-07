@@ -11,10 +11,11 @@ import com.github.plokhotnyuk.jsoniter_scala.core._
 import loci.communicator.webrtc
 import loci.communicator.webrtc.WebRTC
 import loci.communicator.webrtc.WebRTC.ConnectorFactory
+import app.WebApp.peerId
 
 import scala.concurrent.{Future, Promise}
 
-case class WebRTCHandling(registry: Registry, peerId: String) {
+case class WebRTCHandling(registry: Registry) {
 
   val codec: JsonValueCodec[webrtc.WebRTC.CompleteSession] = JsonCodecMaker.make
 
@@ -28,7 +29,6 @@ case class WebRTCHandling(registry: Registry, peerId: String) {
     def connected() = {
       renderedPre.textContent = ""
       renderedTa.value = ""
-      println(s"$id is connected to a peer")
     }
 
     def showSession(s: WebRTC.CompleteSession) = {
@@ -41,14 +41,14 @@ case class WebRTCHandling(registry: Registry, peerId: String) {
       "host",
       onclick := { (uie: UIEvent) =>
         val res = webrtcIntermediate(WebRTC.offer())
-        println(res.session)
+//        println(res.session)
         res.session.foreach(x => {
-          println(x)
+//          println(x)
           showSession(x)
         })
         pendingServer = Some(res)
         registry.connect(res.connector).foreach(x => {
-          println(x)
+//          println(x)
           connected()
         })
       }
@@ -62,11 +62,11 @@ case class WebRTCHandling(registry: Registry, peerId: String) {
           case None => // we are client
             val res = webrtcIntermediate(WebRTC.answer())
             res.session.foreach(x => {
-              println(x)
+//              println(x)
               showSession(x)
             })
             registry.connect(res.connector).foreach(x => {
-              println(x)
+//              println(x)
               connected()
             })
             res.connector
