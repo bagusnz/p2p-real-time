@@ -9,8 +9,8 @@ import kofre.dotted.{Dotted}
 
 object Codecs {
 
-  implicit val peerSetTransmittable: IdenticallyTransmittable[Dotted[AddWinsSet[Peer]]] = IdenticallyTransmittable()
-  implicit val codecState: JsonValueCodec[Dotted[AddWinsSet[Peer]]] = JsonCodecMaker.make(CodecMakerConfig.withMapAsArray(true))
+  implicit val peerSetTransmittable: IdenticallyTransmittable[Dotted[AddWinsSet[PeerPair]]] = IdenticallyTransmittable()
+  implicit val codecState: JsonValueCodec[Dotted[AddWinsSet[PeerPair]]] = JsonCodecMaker.make(CodecMakerConfig.withMapAsArray(true))
 
   implicit val statusSetTransmittable: IdenticallyTransmittable[Dotted[AddWinsSet[Status]]] = IdenticallyTransmittable()
   implicit val statusCodecState: JsonValueCodec[Dotted[AddWinsSet[Status]]] = JsonCodecMaker.make(CodecMakerConfig.withMapAsArray(true))

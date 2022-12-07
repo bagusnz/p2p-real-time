@@ -21,5 +21,5 @@ class Status(var id: String, var status: Boolean, var remove: Boolean, var ref: 
     result
   }
 
-  override def toString = s"StatusClass($id, $status, $remove, $ref)"
+  override def toString = s"Status($id, $status, $remove, $ref)"
 }

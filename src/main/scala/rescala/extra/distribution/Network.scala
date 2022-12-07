@@ -1,6 +1,6 @@
 package rescala.extra.distribution
 
-import app.{Peer, Status}
+import app.{PeerPair, Status}
 import loci.registry.{Binding, Registry}
 import loci.transmitter.RemoteRef
 import kofre.base.Lattice

@@ -8,12 +8,13 @@ import rescala.default.*
 import scalatags.JsDom.all.*
 import app.Codecs.*
 import kofre.base.Defs
-import kofre.datatypes.{AddWinsSet}
+import kofre.datatypes.AddWinsSet
 import rescala.extra.distribution.Network
 import kofre.dotted.Dotted
-
 import loci.serializer.jsoniterScala.given
 import rescala.extra.Tags.SignalTagListToScalatags
+
+import scala.math.*
 
 object WebApp {
 
@@ -27,6 +28,35 @@ object WebApp {
   }
 
   def setupUI(): Unit = {
+
+    //
+    // UI
+    //
+
+    val canvasElem = canvas(
+      border := "1px solid red",
+      width := "100%",
+      height := "100%",
+    ).render
+
+    val divWebRTC = div(
+      `class` := "row",
+      WebRTCHandling(registry).webrtcHandlingArea.render
+    ).render
+
+    val divCanvas = div(
+      `class` := "row",
+      div(
+        `class` := "col",
+        canvasElem,
+      )
+    ).render
+
+    val gridElem = div(
+      `class` := "container",
+      divWebRTC,
+      divCanvas
+    ).render
 
     //
     // MAP[remoteRef, peerId]
@@ -48,32 +78,33 @@ object WebApp {
     }
 
     //
-    // PEERS
+    // PEER PAIRS
     //
 
-    val peersEvt = Evt[Peer]()
-    val peers: Signal[Dotted[AddWinsSet[Peer]]] = peersEvt.fold(Dotted(AddWinsSet.empty[Peer])){ (current, peer) =>
+    val peerPairsEvt = Evt[PeerPair]()
+    val peerPairs: Signal[Dotted[AddWinsSet[PeerPair]]] = peerPairsEvt.fold(Dotted(AddWinsSet.empty[PeerPair])){ (current, peerPair) =>
       // disconnected peer-pairs should be removed by checking either the IDs match the disconnected ID, otherwise add new one
-      if (peer.right == "disconnected") {
-        val currentList: List[Peer] = current.named(peerId).elements.toList
-        var temp: List[Peer] = List[Peer]()
-        for (peerElem <- currentList) {
-          if (peerElem.consistsString(peer.left)) {
-            println(s"removing element $peerElem")
-            temp = peerElem :: temp
+      if (peerPair.right == "disconnected") {
+        val currentList: List[PeerPair] = current.named(peerId).elements.toList
+        var temp: List[PeerPair] = List[PeerPair]()
+        for (peerPairElem <- currentList) {
+          if (peerPairElem.consistsString(peerPair.left)) {
+            println(s"removing element $peerPairElem")
+            temp = peerPairElem :: temp
           }
         }
         current.named(peerId).removeAll(temp).anon
       } else {
-        current.named(peerId).add(peer).anon
+        current.named(peerId).add(peerPair).anon
       }
     }
 
-    Network.replicate(peers, None, registry)(Binding("peers"))
+    Network.replicate(peerPairs, None, registry)(Binding("peers"))
 
-    peers.changed.observe { x =>
+    peerPairs.changed.observe { x =>
       println(s"====== PEERS CHANGED ======")
       x.store.elements.toList.foreach(x => println(x))
+      drawNetwork(peerPairs, canvasElem, divCanvas)
     }
 
     //
@@ -112,7 +143,7 @@ object WebApp {
       // do the following if the status is in the list and members "remove" and "status" are false
       if(listStatus.contains(x) && !x.remove && !x.status){
         // this will find and delete the peer-pairs that are disconnected
-        peersEvt(new Peer(remotes.now.get(x.ref).get, "disconnected"))
+        peerPairsEvt(new PeerPair(remotes.now.get(x.ref).get, "disconnected"))
         // this will remove the map of the remote reference
         remotesEvt.fire((x.ref, "", false))
         // this will remove the temporary entry that was just created
@@ -139,7 +170,7 @@ object WebApp {
         }
 
         // create the peer-pair
-        peersEvt.fire(new Peer(peerOne.id, peerTwo.id))
+        peerPairsEvt.fire(new PeerPair(peerOne.id, peerTwo.id))
 
         // delete the elements in the list
         statusesEvt.fire(new Status(peerOne.id, true, true, peerOne.ref))
@@ -147,82 +178,92 @@ object WebApp {
       }
     }
 
-
-    val contentPeers: Set[Peer] = peers.now.store.elements
+    val contentPeers: Set[PeerPair] = peerPairs.now.store.elements
     contentPeers.foreach(x => println(x))
 
     val contentPeerStatus: Set[Status] = statuses.now.store.elements
     contentPeerStatus.foreach(x => println(x))
 
-
-    //
-    // UI
-    //
-
-    val canvasElem = canvas(
-      border := "1px solid red",
-      width := "100%",
-      height := "100%",
-    ).render
-
-    val divWebRTC = div(
-      `class` := "row",
-      WebRTCHandling(registry).webrtcHandlingArea.render
-    ).render
-
-    val divCanvas = div(
-      `class` := "row",
-      div(
-        `class` := "col",
-        canvasElem,
-      )
-    ).render
-
-    val gridElem = div(
-      `class` := "container",
-      divWebRTC,
-//      div(display.asModifierL),
-      divCanvas
-    ).render
-
     document.body.appendChild(gridElem)
-    drawNetwork(canvasElem, divCanvas)
-
   }
 
-  def drawNetwork(canvasElem: Canvas, divCanvas: Div): Unit = {
+  def drawNetwork(peerPairs: Signal[Dotted[AddWinsSet[PeerPair]]], canvasElem: Canvas, divCanvas: Div): Unit = {
 
-    val ctx = canvasElem.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+    val pairs: Set[PeerPair] = peerPairs.now.store.elements
+    var uniqueIds: Set[String] = Set()
+    var peers: Set[Peer] = Set()
 
-    // make the canvas not pixelated
-    canvasElem.width = divCanvas.getBoundingClientRect().width.toInt
-    //    canvasElem.height = divCanvas.getBoundingClientRect().height.toInt
-    canvasElem.height = dom.window.innerHeight.toInt
+    pairs.foreach( pair => {
+      uniqueIds = uniqueIds + (pair.left, pair.right)
+    })
 
-    ctx.lineWidth = 3
-    ctx.strokeStyle = "green"
+    val peersSize: Int = uniqueIds.size
 
-    ctx.beginPath()
-    ctx.moveTo(100 / 2, 100 / 2)
-    ctx.lineTo(600 + 100 / 2, 25 + 100 / 2)
+    if(peersSize > 0){
 
-    ctx.moveTo(100 / 2, 100 / 2)
-    ctx.lineTo(300 + 100 / 2, 105 + 100 / 2)
+      val ctx = canvasElem.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
 
-    ctx.moveTo(600 + 100 / 2, 25 + 100 / 2)
-    ctx.lineTo(300 + 100 / 2, 105 + 100 / 2)
+      // make the canvas not pixelated
+      canvasElem.width = divCanvas.getBoundingClientRect().width.toInt
+      //    canvasElem.height = divCanvas.getBoundingClientRect().height.toInt
+      canvasElem.height = dom.window.innerHeight.toInt
 
-    ctx.stroke()
+      val centerX = canvasElem.width/2
+      val centerY = canvasElem.height/2
+      val radius = Math.min(centerX, centerY)/2
+      val imageSize = 100
+      val distanceBetweenPeers: Int = 360 / peersSize
+      var currentPosition: Double = 0
 
-    // create the canvas
-    val image = document.createElement("img").asInstanceOf[Image]
-    image.src = "images/circle.png"
-    image.onload = (e: dom.Event) => {
-      ctx.drawImage(image, 0, 0, 100, 100)
-      ctx.drawImage(image, 600, 25, 100, 100)
-      ctx.drawImage(image, 300, 105, 100, 100)
+      // Create new Peer object from each unique IDs
+      uniqueIds.foreach(id => {
+        val newPeer = new Peer(id, centerX + radius * sin(toRadians(currentPosition+distanceBetweenPeers)), centerY + radius*cos(toRadians(currentPosition+distanceBetweenPeers)))
+        peers = peers + newPeer
+        currentPosition = currentPosition + distanceBetweenPeers
+      })
+
+      // create the canvas
+      val image = document.createElement("img").asInstanceOf[Image]
+      image.src = "images/circle.png"
+      image.onload = (e: dom.Event) => {
+        peers.foreach(peer => ctx.drawImage(image, peer.x, peer.y, imageSize, imageSize))
+  //      ctx.drawImage(image, 0, 0, 100, 100)
+  //      ctx.drawImage(image, 600, 25, 100, 100)
+  //      ctx.drawImage(image, 300, 105, 100, 100)
+      }
+
+      ctx.lineWidth = 3
+      ctx.strokeStyle = "green"
+
+      // Make the connection lines
+      ctx.beginPath()
+      pairs.foreach(pair => {
+        var peerLeft: Option[Peer] = None
+        var peerRight: Option[Peer] = None
+        peers.foreach(peer => {
+          if (peer.id == pair.left || peer.id == pair.right) {
+            if (peerLeft.isEmpty) peerLeft = Some(peer)
+            else if (peerRight.isEmpty) peerRight = Some(peer)
+          }
+        })
+        ctx.moveTo(peerLeft.get.x + imageSize/2, peerLeft.get.y + imageSize/2)
+        ctx.lineTo(peerRight.get.x + imageSize/2, peerRight.get.y + imageSize/2)
+
+      })
+      ctx.stroke()
+
+      //    ctx.beginPath()
+      //    ctx.moveTo(100 / 2, 100 / 2)
+      //    ctx.lineTo(600 + 100 / 2, 25 + 100 / 2)
+      //
+      //    ctx.moveTo(100 / 2, 100 / 2)
+      //    ctx.lineTo(300 + 100 / 2, 105 + 100 / 2)
+
+      //    ctx.moveTo(600 + 100 / 2, 25 + 100 / 2)
+      //    ctx.lineTo(300 + 100 / 2, 105 + 100 / 2)
+      //
+      //    ctx.stroke()
+
     }
-
   }
-
 }
