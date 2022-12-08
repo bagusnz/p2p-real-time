@@ -23,13 +23,7 @@ class PeerPair(var left: String, var right: String) {
       case _ => false
     }
 
-  override def hashCode(): Int = {
-    val prime = 31
-    var result = 1
-    result = prime * result + left.hashCode;
-    result = prime * result + right.hashCode
-    result
-  }
+  override def hashCode(): Int = left.hashCode + right.hashCode
 
   override def toString = s"PeerPair($left, $right)"
 }

@@ -13,13 +13,7 @@ class Status(var id: String, var status: Boolean, var remove: Boolean, var ref: 
       case _ => false
     }
 
-  override def hashCode(): Int = {
-    val prime = 31
-    var result = 1
-    result = prime * result + id.hashCode
-    result = prime * result + ref.hashCode
-    result
-  }
+  override def hashCode(): Int = id.hashCode + ref.hashCode
 
   override def toString = s"Status($id, $status, $remove, $ref)"
 }
