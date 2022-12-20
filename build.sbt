@@ -32,5 +32,8 @@ libraryDependencies ++= Seq(
   "com.github.plokhotnyuk.jsoniter-scala" %%% "jsoniter-scala-macros" % "2.18.1"
 )
 
+// NB: 1.2.0 is the last release to support Scala 2.11
+libraryDependencies += "com.monovore" %%% "decline" % "2.4.1"
+
 // This is an application with a main method
 scalaJSUseMainModuleInitializer := true
