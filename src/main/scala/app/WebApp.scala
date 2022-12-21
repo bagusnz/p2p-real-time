@@ -59,6 +59,8 @@ object WebApp {
       divCanvas
     ).render
 
+    val ctx = canvasElem.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+
     //
     // MAP[remoteRef, peerId]
     //
@@ -102,10 +104,10 @@ object WebApp {
 
     Network.replicate(peerPairs, None, registry)(Binding("peers"))
 
-    peerPairs.changed.observe { x =>
+    peerPairs.observe { peerPairs =>
 //      println(s"====== PEERS CHANGED ======")
 //      x.store.elements.toList.foreach(x => println(x))
-      drawNetwork(peerPairs, canvasElem, divCanvas)
+      drawNetwork(peerPairs.store.elements, canvasElem, divCanvas, ctx)
     }
 
     //
@@ -188,91 +190,66 @@ object WebApp {
     document.body.appendChild(gridElem)
   }
 
-  def drawNetwork(peerPairs: Signal[Dotted[AddWinsSet[PeerPair]]], canvasElem: Canvas, divCanvas: Div): Unit = {
+  def drawNetwork(pairs: Set[PeerPair], canvasElem: Canvas, divCanvas: Div, ctx: CanvasRenderingContext2D): Unit = {
+    val dpr = dom.window.devicePixelRatio
+    val canvasElemHeight = dom.window.getComputedStyle(canvasElem).getPropertyValue("height").dropRight(2)
+    val canvasElemWidth = dom.window.getComputedStyle(canvasElem).getPropertyValue("width").dropRight(2)
 
-    val pairs: Set[PeerPair] = peerPairs.now.store.elements
-    var uniqueIds: Set[String] = Set()
-    var peers: Set[Peer] = Set()
-
-    pairs.foreach( pair => {
-      uniqueIds = uniqueIds + (pair.left, pair.right)
-    })
-
+    val uniqueIds: Set[String] = pairs.flatMap(pair => Set(pair.left, pair.right))
     val peersSize: Int = uniqueIds.size
 
-    val ctx = canvasElem.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+    // return if there are no p2p connection yet or canvas' height&width is not yet set
+    if(peersSize == 0 || (canvasElemWidth == "" || canvasElemHeight == "")){
+      return
+    }
 
-    // make the canvas not pixelated
-    canvasElem.width = divCanvas.getBoundingClientRect().width.toInt
-    //    canvasElem.height = divCanvas.getBoundingClientRect().height.toInt
-    canvasElem.height = dom.window.innerHeight.toInt
-    ctx.clearRect(0, 0, canvasElem.width, canvasElem.height)
+    // fix the pixels for the canvas, to not cause blurriness
+    canvasElem.setAttribute("height", canvasElemHeight * dpr.toInt)
+    canvasElem.setAttribute("width", canvasElemWidth * dpr.toInt)
 
-    if(peersSize > 0){
+    /* setting the canvas width and height based on the window (another alternative to make the canvas not pixelated */
+    // canvasElem.width = divCanvas.getBoundingClientRect().width.toInt
+    // canvasElem.height = divCanvas.getBoundingClientRect().height.toInt
+    // canvasElem.height = dom.window.innerHeight.toInt
 
-      val imageSize = 100
-      val offsetImage = imageSize/2
-      val centerX = canvasElem.width/2 - offsetImage
-      val centerY = canvasElem.height/2 - offsetImage
-      val radius = Math.min(centerX, centerY)/2
-      val distanceBetweenPeers: Int = 360 / peersSize
-      var currentPosition: Double = 0
+    val imageSize = 100
+    val offsetImage = imageSize/2
+    val centerX = canvasElemWidth.toDouble/2 - offsetImage
+    val centerY = canvasElemHeight.toDouble/2 - offsetImage
+    val radius = Math.min(centerX, centerY)/2
+    val distanceBetweenPeers: Int = 360 / peersSize
 
-      // Create new Peer object from each unique IDs
-      uniqueIds.toList.sorted.foreach(id => {
-        val newPeer = new Peer(id, centerX + radius * sin(toRadians(currentPosition+distanceBetweenPeers)), centerY + radius*cos(toRadians(currentPosition+distanceBetweenPeers)))
-        peers = peers + newPeer
-        currentPosition = currentPosition + distanceBetweenPeers
-      })
+    // Create new Peer object from each unique IDs
+    val peers: Map[String, Peer] = uniqueIds.toList.sorted.zipWithIndex.map((id, index) => {
+      id -> Peer(id, centerX + radius * sin(toRadians(distanceBetweenPeers*index)), centerY + radius*cos(toRadians(distanceBetweenPeers*index)))
+    }).toMap
 
-      ctx.lineWidth = 3
-      ctx.strokeStyle = "green"
+    // do the drawing after image has been loaded
+    val image = document.createElement("img").asInstanceOf[Image]
+    image.src = "images/desktop.png"
+    image.onload = (e: dom.Event) => {
+
+      // reset the canvas
+      ctx.clearRect(0, 0, canvasElemWidth.toDouble, canvasElemHeight.toDouble)
 
       // Make the connection lines
+      ctx.lineWidth = 3
+      ctx.strokeStyle = "green"
       ctx.beginPath()
       pairs.foreach(pair => {
-        var peerLeft: Option[Peer] = None
-        var peerRight: Option[Peer] = None
-        peers.foreach(peer => {
-          if (peer.id == pair.left || peer.id == pair.right) {
-            if (peerLeft.isEmpty) peerLeft = Some(peer)
-            else if (peerRight.isEmpty) peerRight = Some(peer)
-          }
-        })
-        ctx.moveTo(peerLeft.get.x + imageSize / 2, peerLeft.get.y + imageSize / 2)
-        ctx.lineTo(peerRight.get.x + imageSize / 2, peerRight.get.y + imageSize / 2)
-
+        val peerLeft: Peer = peers(pair.left)
+        val peerRight: Peer = peers(pair.right)
+        ctx.moveTo(peerLeft.x + imageSize / 2, peerLeft.y + imageSize / 2)
+        ctx.lineTo(peerRight.x + imageSize / 2, peerRight.y + imageSize / 2)
       })
       ctx.stroke()
 
-      // create the canvas
-      val image = document.createElement("img").asInstanceOf[Image]
-      image.src = "images/desktop.png"
-      image.onload = (e: dom.Event) => {
-        peers.foreach(peer => {
-          ctx.drawImage(image, peer.x, peer.y, imageSize, imageSize)
-          val peerText = if(peer.id == peerId) "You" else peer.id
-          ctx.fillText(peerText, peer.x, peer.y, imageSize*5)
-        })
-//        ctx.drawImage(image, 0, 0, 100, 100)
-//        ctx.drawImage(image, 600, 25, 100, 100)
-//        ctx.drawImage(image, 300, 105, 100, 100)
-      }
-
-
-
-      //    ctx.beginPath()
-      //    ctx.moveTo(100 / 2, 100 / 2)
-      //    ctx.lineTo(600 + 100 / 2, 25 + 100 / 2)
-      //
-      //    ctx.moveTo(100 / 2, 100 / 2)
-      //    ctx.lineTo(300 + 100 / 2, 105 + 100 / 2)
-
-      //    ctx.moveTo(600 + 100 / 2, 25 + 100 / 2)
-      //    ctx.lineTo(300 + 100 / 2, 105 + 100 / 2)
-      //
-      //    ctx.stroke()
-
+      // insert the peer image
+      peers.foreach((id, peer) => {
+        ctx.drawImage(image, peer.x, peer.y, imageSize, imageSize)
+        val peerText = if(peer.id == peerId) "You" else peer.id
+        ctx.fillText(peerText, peer.x, peer.y, imageSize*5)
+      })
     }
   }
 }

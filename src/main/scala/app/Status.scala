@@ -1,6 +1,6 @@
 package app
 
-class Status(var id: String, var status: Boolean, var remove: Boolean, var ref: String) {
+class Status(val id: String, val status: Boolean, val remove: Boolean, val ref: String) {
 
   def canEqual(a: Any) = a.isInstanceOf[Status]
 

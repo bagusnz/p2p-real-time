@@ -1,6 +1,6 @@
 package app
 
-class PeerPair(var left: String, var right: String) {
+class PeerPair(val left: String, val right: String) {
 
   def consistsString(s: String): Boolean = {
     this.left == s || this.right == s
