@@ -34,7 +34,7 @@ object WebApp {
     //
 
     val canvasElem = canvas(
-      border := "1px solid red",
+      border := "1px solid black",
       width := "100%",
       height := "100%",
     ).render
@@ -60,6 +60,8 @@ object WebApp {
     ).render
 
     val ctx = canvasElem.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
+
+    document.body.appendChild(gridElem)
 
     //
     // MAP[remoteRef, peerId]
@@ -106,8 +108,30 @@ object WebApp {
 
     peerPairs.observe { peerPairs =>
 //      println(s"====== PEERS CHANGED ======")
-//      x.store.elements.toList.foreach(x => println(x))
-      drawNetwork(peerPairs.store.elements, canvasElem, divCanvas, ctx)
+//      peerPairs.store.elements.toList.foreach(x => println(x))
+
+      /**
+       *  This block is to remove any peers that are in different clusters
+       *  eg, this is p1, and peers are (p1,p2),(p4,p5),(p3,p2),(p3,p4)
+       *  then p3 disconnects, the peers still saved (p4,p5) even though it is not connected to the same cluster with p1 anymore
+       *  currently removal in the CRDT has not been realized due to the difference when peers are connecting with other peer
+       *  the CRDT still have the peers that are connected but not in the same network anymore
+       *
+       *  Maybe use cleanup button?
+       */
+      var ids = scala.collection.mutable.Set[String]()
+      findPeersInTheSameCluster(ids, peerId, peerPairs.store.elements.toList)
+      val uniqueIds: Set[String] = peerPairs.store.elements.flatMap(pair => Set(pair.left, pair.right))
+      val notInNetworkIds: List[String] = uniqueIds.toList.filter(id => !ids.contains(id))
+      val peerPairsInCluster: Set[PeerPair] = peerPairs.store.elements.toList.filter(pp => !notInNetworkIds.contains(pp.left) && !notInNetworkIds.contains(pp.right)).toSet
+      //      if(!isInConnectionProcess && notInNetworkIds.size > 0){
+      //        notInNetworkIds.foreach( removeId => {
+      //          println(s"removing $removeId")
+      //          peerPairsEvt(new PeerPair(removeId, "disconnected"))
+      //        })
+      //      }
+
+      drawNetwork(peerPairsInCluster, canvasElem, divCanvas, ctx)
     }
 
     //
@@ -186,10 +210,35 @@ object WebApp {
 
     val contentPeerStatus: Set[Status] = statuses.now.store.elements
     contentPeerStatus.foreach(x => println(x))
-
-    document.body.appendChild(gridElem)
   }
 
+  /**
+   * Recursive function to get the peerIds of those that are connected in the same cluster as this peer
+   *
+   * @param idSet: set that saves the peerIds
+   * @param id: string of the peer id
+   * @param peerPairs: the peer pairs from CRDT
+   */
+  def findPeersInTheSameCluster(idSet: scala.collection.mutable.Set[String], id: String, peerPairs: List[PeerPair]): Unit = {
+    if (idSet.contains(id)){
+      return
+    }
+    idSet += id
+    val currentPeerPairs: List[PeerPair] = peerPairs.filter(pp => id == pp.left || id == pp.right)
+    currentPeerPairs.foreach(pp => {
+      val nextString: String = if (id == pp.left) pp.right else pp.left
+      findPeersInTheSameCluster(idSet, nextString, peerPairs)
+    })
+  }
+
+  /**
+   * Process and draw the topology of the p2p network
+   *
+   * @param pairs: peer pairs from the CRDT
+   * @param canvasElem: the canvas element
+   * @param divCanva: the canvas div block
+   * @param ctx: the canvas' context
+   */
   def drawNetwork(pairs: Set[PeerPair], canvasElem: Canvas, divCanvas: Div, ctx: CanvasRenderingContext2D): Unit = {
     val dpr = dom.window.devicePixelRatio
     val canvasElemHeight = dom.window.getComputedStyle(canvasElem).getPropertyValue("height").dropRight(2)
@@ -197,11 +246,6 @@ object WebApp {
 
     val uniqueIds: Set[String] = pairs.flatMap(pair => Set(pair.left, pair.right))
     val peersSize: Int = uniqueIds.size
-
-    // return if there are no p2p connection yet or canvas' height&width is not yet set
-    if(peersSize == 0 || (canvasElemWidth == "" || canvasElemHeight == "")){
-      return
-    }
 
     // fix the pixels for the canvas, to not cause blurriness
     canvasElem.setAttribute("height", canvasElemHeight * dpr.toInt)
@@ -216,7 +260,16 @@ object WebApp {
     val offsetImage = imageSize/2
     val centerX = canvasElemWidth.toDouble/2 - offsetImage
     val centerY = canvasElemHeight.toDouble/2 - offsetImage
-    val radius = Math.min(centerX, centerY)/2
+    val radius = Math.min(centerX*1.5, centerY*1.5)/2
+
+    // return if the peer is not yet connected. Also show hint to connect
+    if (peersSize == 0) {
+      ctx.font = "20px sans-serif"
+      ctx.clearRect(0, 0, canvasElemWidth.toDouble, canvasElemHeight.toDouble)
+      ctx.fillText("Please connect to a peer", centerX-offsetImage, centerY+offsetImage, imageSize*5)
+      return
+    }
+
     val distanceBetweenPeers: Int = 360 / peersSize
 
     // Create new Peer object from each unique IDs
@@ -235,6 +288,7 @@ object WebApp {
       // Make the connection lines
       ctx.lineWidth = 3
       ctx.strokeStyle = "green"
+      ctx.font = "14px sans-serif"
       ctx.beginPath()
       pairs.foreach(pair => {
         val peerLeft: Peer = peers(pair.left)
