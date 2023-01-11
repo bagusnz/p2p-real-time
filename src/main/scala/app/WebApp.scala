@@ -240,32 +240,32 @@ object WebApp {
    * @param ctx: the canvas' context
    */
   def drawNetwork(pairs: Set[PeerPair], canvasElem: Canvas, divCanvas: Div, ctx: CanvasRenderingContext2D): Unit = {
-    val dpr = dom.window.devicePixelRatio
-    val canvasElemHeight = dom.window.getComputedStyle(canvasElem).getPropertyValue("height").dropRight(2)
-    val canvasElemWidth = dom.window.getComputedStyle(canvasElem).getPropertyValue("width").dropRight(2)
-
     val uniqueIds: Set[String] = pairs.flatMap(pair => Set(pair.left, pair.right))
     val peersSize: Int = uniqueIds.size
 
-    // fix the pixels for the canvas, to not cause blurriness
-    canvasElem.setAttribute("height", canvasElemHeight * dpr.toInt)
-    canvasElem.setAttribute("width", canvasElemWidth * dpr.toInt)
+    // The commented below is alternative to fixing the pixelated canvas, but currently not working when app is started in browsers in MacOS (firefox,chrome,etc)
+    // Due to the NS_ERROR_FAILURE in javascript. Forum said cause changing canvas' width/height to a big value
+    //    val dpr = dom.window.devicePixelRatio
+    //    val canvasElemHeight = dom.window.getComputedStyle(canvasElem).getPropertyValue("height").dropRight(2)
+    //    val canvasElemWidth = dom.window.getComputedStyle(canvasElem).getPropertyValue("width").dropRight(2)
+    //    canvasElem.setAttribute("height", canvasElemHeight * dpr.toInt)
+    //    canvasElem.setAttribute("width", canvasElemWidth * dpr.toInt)
 
     /* setting the canvas width and height based on the window (another alternative to make the canvas not pixelated */
-    // canvasElem.width = divCanvas.getBoundingClientRect().width.toInt
-    // canvasElem.height = divCanvas.getBoundingClientRect().height.toInt
-    // canvasElem.height = dom.window.innerHeight.toInt
+    canvasElem.width = divCanvas.getBoundingClientRect().width.toInt
+    canvasElem.height = dom.window.innerHeight.toInt
+    //     canvasElem.height = divCanvas.getBoundingClientRect().height.toInt
 
     val imageSize = 100
     val offsetImage = imageSize/2
-    val centerX = canvasElemWidth.toDouble/2 - offsetImage
-    val centerY = canvasElemHeight.toDouble/2 - offsetImage
+    val centerX = canvasElem.width.toDouble/2 - offsetImage
+    val centerY = canvasElem.height.toDouble/2 - offsetImage
     val radius = Math.min(centerX*1.5, centerY*1.5)/2
 
     // return if the peer is not yet connected. Also show hint to connect
     if (peersSize == 0) {
       ctx.font = "20px sans-serif"
-      ctx.clearRect(0, 0, canvasElemWidth.toDouble, canvasElemHeight.toDouble)
+      ctx.clearRect(0, 0, canvasElem.width.toDouble, canvasElem.height.toDouble)
       ctx.fillText("Please connect to a peer", centerX-offsetImage, centerY+offsetImage, imageSize*5)
       return
     }
@@ -283,7 +283,7 @@ object WebApp {
     image.onload = (e: dom.Event) => {
 
       // reset the canvas
-      ctx.clearRect(0, 0, canvasElemWidth.toDouble, canvasElemHeight.toDouble)
+      ctx.clearRect(0, 0, canvasElem.width.toDouble, canvasElem.height.toDouble)
 
       // Make the connection lines
       ctx.lineWidth = 3
