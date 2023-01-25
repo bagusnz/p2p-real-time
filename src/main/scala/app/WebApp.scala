@@ -131,7 +131,7 @@ object WebApp {
       //        })
       //      }
 
-      drawNetwork(peerPairsInCluster, canvasElem, divCanvas, ctx)
+      DrawNetwork(peerPairsInCluster, canvasElem, divCanvas, ctx).draw();
     }
 
     //
@@ -231,79 +231,6 @@ object WebApp {
     })
   }
 
-  /**
-   * Process and draw the topology of the p2p network
-   *
-   * @param pairs: peer pairs from the CRDT
-   * @param canvasElem: the canvas element
-   * @param divCanva: the canvas div block
-   * @param ctx: the canvas' context
-   */
-  def drawNetwork(pairs: Set[PeerPair], canvasElem: Canvas, divCanvas: Div, ctx: CanvasRenderingContext2D): Unit = {
-    val uniqueIds: Set[String] = pairs.flatMap(pair => Set(pair.left, pair.right))
-    val peersSize: Int = uniqueIds.size
+  
 
-    // The commented below is alternative to fixing the pixelated canvas, but currently not working when app is started in browsers in MacOS (firefox,chrome,etc)
-    // Due to the NS_ERROR_FAILURE in javascript. Forum said cause changing canvas' width/height to a big value
-    //    val dpr = dom.window.devicePixelRatio
-    //    val canvasElemHeight = dom.window.getComputedStyle(canvasElem).getPropertyValue("height").dropRight(2)
-    //    val canvasElemWidth = dom.window.getComputedStyle(canvasElem).getPropertyValue("width").dropRight(2)
-    //    canvasElem.setAttribute("height", canvasElemHeight * dpr.toInt)
-    //    canvasElem.setAttribute("width", canvasElemWidth * dpr.toInt)
-
-    /* setting the canvas width and height based on the window (another alternative to make the canvas not pixelated */
-    canvasElem.width = divCanvas.getBoundingClientRect().width.toInt
-    canvasElem.height = dom.window.innerHeight.toInt
-    //     canvasElem.height = divCanvas.getBoundingClientRect().height.toInt
-
-    val imageSize = 100
-    val offsetImage = imageSize/2
-    val centerX = canvasElem.width.toDouble/2 - offsetImage
-    val centerY = canvasElem.height.toDouble/2 - offsetImage
-    val radius = Math.min(centerX*1.5, centerY*1.5)/2
-
-    // return if the peer is not yet connected. Also show hint to connect
-    if (peersSize == 0) {
-      ctx.font = "20px sans-serif"
-      ctx.clearRect(0, 0, canvasElem.width.toDouble, canvasElem.height.toDouble)
-      ctx.fillText("Please connect to a peer", centerX-offsetImage, centerY+offsetImage, imageSize*5)
-      return
-    }
-
-    val distanceBetweenPeers: Int = 360 / peersSize
-
-    // Create new Peer object from each unique IDs
-    val peers: Map[String, Peer] = uniqueIds.toList.sorted.zipWithIndex.map((id, index) => {
-      id -> Peer(id, centerX + radius * sin(toRadians(distanceBetweenPeers*index)), centerY + radius*cos(toRadians(distanceBetweenPeers*index)))
-    }).toMap
-
-    // do the drawing after image has been loaded
-    val image = document.createElement("img").asInstanceOf[Image]
-    image.src = "images/desktop.png"
-    image.onload = (e: dom.Event) => {
-
-      // reset the canvas
-      ctx.clearRect(0, 0, canvasElem.width.toDouble, canvasElem.height.toDouble)
-
-      // Make the connection lines
-      ctx.lineWidth = 3
-      ctx.strokeStyle = "green"
-      ctx.font = "14px sans-serif"
-      ctx.beginPath()
-      pairs.foreach(pair => {
-        val peerLeft: Peer = peers(pair.left)
-        val peerRight: Peer = peers(pair.right)
-        ctx.moveTo(peerLeft.x + imageSize / 2, peerLeft.y + imageSize / 2)
-        ctx.lineTo(peerRight.x + imageSize / 2, peerRight.y + imageSize / 2)
-      })
-      ctx.stroke()
-
-      // insert the peer image
-      peers.foreach((id, peer) => {
-        ctx.drawImage(image, peer.x, peer.y, imageSize, imageSize)
-        val peerText = if(peer.id == peerId) "You" else peer.id
-        ctx.fillText(peerText, peer.x, peer.y, imageSize*5)
-      })
-    }
-  }
 }
