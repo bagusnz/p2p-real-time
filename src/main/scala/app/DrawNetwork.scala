@@ -74,33 +74,70 @@ class DrawNetwork(val pairs: Set[PeerPair], val canvasElem: Canvas, val divCanva
    * @return
    */
   private def calculatePeerPosition(canvasWidth: Double, canvasHeight: Double, centerX: Double, centerY: Double): Map[String, Peer] = {
-    val result: scala.collection.mutable.Map[String, Peer] = scala.collection.mutable.Map.empty
+    var result: scala.collection.mutable.Map[String, Peer] = scala.collection.mutable.Map.empty
 
     val connectedPeersSizeMap: Map[Int, Int] = pairMap.map(p => {
       p._1 -> p._2.size
     }).toMap
 
-    val eachPeerLessThanTwo = connectedPeersSizeMap.forall(p => p._2 <= 2)
-
+    // only linear is currently using the grid system --> might be deleted later, or maybe might be useful for hybrid topology (if possible)
     val canvasGrid = Array.ofDim[String](peersSize, peersSize)
     var col: Int = 0
     var row: Int = 0
+
     var stack = scala.collection.mutable.Stack[Int]()
     val processed = new Array[Boolean](peersSize)
 
-    if(criticalPairs.size == 0){
-      val radius = Math.min(centerX * 1.5, centerY * 1.5) / 2
-      val distanceBetweenPeers: Int = 360 / peersSize
-      // RING TOPOLOGY
-      uniqueIds.toList.sorted.zipWithIndex.map((id, index) => {
-        id -> Peer(id, centerX + radius * sin(toRadians(distanceBetweenPeers * index)), centerY + radius * cos(toRadians(distanceBetweenPeers * index)))
-      }).toMap
-    } else {
-      // Star topology
+    val radius = Math.min(centerX * 1.5, centerY * 1.5) / 2
+    var distanceBetweenPeers = 360 / peersSize
 
-      // LINEAR topology
+    var showMesh = false
+
+    /**
+     * If there is no critical pairs --> network has cycle loop(s)
+     * * if each of the peer are exactly connected with 2 peers --> RING TOPOLOGY
+     * * else show the network in MESH TOPOLOGY
+     * Else (if there is critical pairs) --> network has no cycle loop
+     * * if the number of critical pairs are the same as the number of peer connections AND each of the peer are exactly connected with 1 or 2 peer(s) --> LINEAR TOPOLOGY
+     * * else
+     * * * if there is one peer that has multiple connection to other peers AND all other peers are exactly connected with only 1 peer --> STAR TOPOLOGY
+     * * * else show the network in MESH TOPOLOGY
+     * * *
+     * *
+     *
+     */
+    if(criticalPairs.size == 0){
+      val eachPeerEqualsTwo = connectedPeersSizeMap.forall(p => p._2 == 2)
+      if(eachPeerEqualsTwo){
+        // RING TOPOLOGY
+        var ringOrder = ListBuffer[Int]()
+        val mid = peersSize / 2
+        col = mid
+        stack.push(connectedPeersSizeMap.head._1)
+        while (stack.size > 0) {
+          val curr = stack.pop()
+          if (!processed(curr)) {
+            ringOrder += curr
+            processed(curr) = true
+            pairMap.get(curr).get.foreach(i => stack.push(i))
+          }
+        }
+
+        ringOrder.zipWithIndex.foreach((idAsIndex, index) => {
+          result.put(indexToId.get(idAsIndex).get,
+            Peer(indexToId.get(idAsIndex).get, centerX + radius * sin(toRadians(distanceBetweenPeers * index)), centerY + radius * cos(toRadians(distanceBetweenPeers * index))))
+        })
+
+      } else {
+        // MESH TOPOLOGY
+        showMesh = true
+      }
+    } else {
+      val eachPeerLessThanTwo = connectedPeersSizeMap.forall(p => p._2 <= 2)
+
       if(criticalPairs.size == pairs.size && eachPeerLessThanTwo) {
-        row = peersSize/2
+        // LINEAR TOPOLOGY
+        row = (peersSize/2)-1
         stack.push(connectedPeersSizeMap.toList.sortBy(_._2).head._1)
         while(stack.size > 0){
           val curr = stack.pop()
@@ -116,15 +153,38 @@ class DrawNetwork(val pairs: Set[PeerPair], val canvasElem: Canvas, val divCanva
         for(row <- 0 until peersSize){
           for(col <- 0 until peersSize){
             if(canvasGrid(row)(col) != null){
-              result.put(canvasGrid(row)(col), Peer(canvasGrid(row)(col), (canvasWidth/peersSize * col) + canvasWidth/peersSize/2, (canvasHeight/peersSize * row) + canvasHeight/peersSize/2))
+              result.put(canvasGrid(row)(col),
+                Peer(canvasGrid(row)(col), (canvasWidth/peersSize * col) + canvasWidth/peersSize/2, (canvasHeight/peersSize * row) + canvasHeight/peersSize/2))
             }
           }
         }
-        result.toMap
       } else {
-        Map.empty
+        val peersWithOneConn = connectedPeersSizeMap.filter(p => p._2 == 1)
+        val peersWithMultConn = connectedPeersSizeMap.filter(p => p._2 > 1)
+
+        if(peersWithMultConn.size == 1 && peersWithOneConn.size == connectedPeersSizeMap.size-1){
+          //STAR TOPOLOGY
+          distanceBetweenPeers = 360 / peersWithOneConn.size
+          result.put(indexToId.get(peersWithMultConn.head._1).get, Peer(indexToId.get(peersWithMultConn.head._1).get, centerX, centerY))
+          peersWithOneConn.zipWithIndex.foreach((p, index) => {
+            result.put(indexToId.get(p._1).get,
+              Peer(indexToId.get(p._1).get, centerX + radius * sin(toRadians(distanceBetweenPeers * index)), centerY + radius * cos(toRadians(distanceBetweenPeers * index))))
+          })
+        } else {
+          // MESH TOPOLOGY
+          showMesh = true
+        }
       }
     }
+
+    if(showMesh){
+      uniqueIds.toList.sorted.zipWithIndex.map((id, index) => {
+        id -> Peer(id, centerX + radius * sin(toRadians(distanceBetweenPeers * index)), centerY + radius * cos(toRadians(distanceBetweenPeers * index)))
+      }).toMap
+    } else {
+      result.toMap
+    }
+
   }
 
   /**
