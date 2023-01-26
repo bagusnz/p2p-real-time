@@ -14,7 +14,6 @@ class DrawNetwork(val pairs: Set[PeerPair], val canvasElem: Canvas, val divCanva
   private val indexToId: Map[Int, String] = uniqueIds.toList.sorted.zipWithIndex.map((id, index) => index -> id).toMap
   private val idToIndex: Map[String, Int] = uniqueIds.toList.sorted.zipWithIndex.map((id, index) => id -> index).toMap
   private val peersSize = uniqueIds.size
-  private val connections: List[List[Int]] = pairs.map(pp => List(idToIndex.get(pp.left).get, idToIndex.get(pp.right).get)).toList
 
   // Variables for the function to find critical pairs
   private var disc: Array[Int] = new Array[Int](peersSize)
@@ -29,6 +28,7 @@ class DrawNetwork(val pairs: Set[PeerPair], val canvasElem: Canvas, val divCanva
    * See Tarjan's Bridge-Finding Algorithm (TBFA)
    */
   private def criticalConnections(): Unit = {
+    val connections: List[List[Int]] = pairs.map(pp => List(idToIndex.get(pp.left).get, idToIndex.get(pp.right).get)).toList
     for(i <- 0 to peersSize-1){
       pairMap.put(i, ListBuffer[Int]())
     }
@@ -64,19 +64,73 @@ class DrawNetwork(val pairs: Set[PeerPair], val canvasElem: Canvas, val divCanva
   }
 
   /**
+   * To calculate where the peers should be positioned in the canvas
+   * based on which topology suit best for the network gathered
+   *
+   * @param canvasWidth
+   * @param canvasHeight
+   * @param centerX
+   * @param centerY
+   * @return
+   */
+  private def calculatePeerPosition(canvasWidth: Double, canvasHeight: Double, centerX: Double, centerY: Double): Map[String, Peer] = {
+    val result: scala.collection.mutable.Map[String, Peer] = scala.collection.mutable.Map.empty
+
+    val connectedPeersSizeMap: Map[Int, Int] = pairMap.map(p => {
+      p._1 -> p._2.size
+    }).toMap
+
+    val eachPeerLessThanTwo = connectedPeersSizeMap.forall(p => p._2 <= 2)
+
+    val canvasGrid = Array.ofDim[String](peersSize, peersSize)
+    var col: Int = 0
+    var row: Int = 0
+    var stack = scala.collection.mutable.Stack[Int]()
+    val processed = new Array[Boolean](peersSize)
+
+    if(criticalPairs.size == 0){
+      val radius = Math.min(centerX * 1.5, centerY * 1.5) / 2
+      val distanceBetweenPeers: Int = 360 / peersSize
+      // RING TOPOLOGY
+      uniqueIds.toList.sorted.zipWithIndex.map((id, index) => {
+        id -> Peer(id, centerX + radius * sin(toRadians(distanceBetweenPeers * index)), centerY + radius * cos(toRadians(distanceBetweenPeers * index)))
+      }).toMap
+    } else {
+      // Star topology
+
+      // LINEAR topology
+      if(criticalPairs.size == pairs.size && eachPeerLessThanTwo) {
+        row = peersSize/2
+        stack.push(connectedPeersSizeMap.toList.sortBy(_._2).head._1)
+        while(stack.size > 0){
+          val curr = stack.pop()
+          if(!processed(curr) && canvasGrid(row)(col) == null){
+            canvasGrid(row)(col) = indexToId.get(curr).get
+            processed(curr) = true
+            println(s"peer $curr saved in row $row, col $col")
+            col += 1
+            pairMap.get(curr).get.foreach(i => stack.push(i))
+          }
+        }
+
+        for(row <- 0 until peersSize){
+          for(col <- 0 until peersSize){
+            if(canvasGrid(row)(col) != null){
+              result.put(canvasGrid(row)(col), Peer(canvasGrid(row)(col), (canvasWidth/peersSize * col) + canvasWidth/peersSize/2, (canvasHeight/peersSize * row) + canvasHeight/peersSize/2))
+            }
+          }
+        }
+        result.toMap
+      } else {
+        Map.empty
+      }
+    }
+  }
+
+  /**
    * Process and draw the topology of the p2p network
    */
   def draw(): Unit = {
-
-    if(peersSize > 0){
-      criticalConnections()
-      println(s"pairMap=$pairMap")
-      if(criticalPairs.size > 0){
-        println(s"ans=$criticalPairs")
-        criticalPairs.foreach(pair => println(s"critical edge = ${pair.left} -- ${pair.right}"))
-      }
-    }
-
     // The commented below is alternative to fixing the pixelated canvas, but currently not working when app is started in browsers in MacOS (firefox,chrome,etc)
     // Due to the NS_ERROR_FAILURE in javascript. Forum said cause changing canvas' width/height to a big value
     //    val dpr = dom.window.devicePixelRatio
@@ -92,24 +146,26 @@ class DrawNetwork(val pairs: Set[PeerPair], val canvasElem: Canvas, val divCanva
 
     val imageSize = 100
     val offsetImage = imageSize / 2
-    val centerX = canvasElem.width.toDouble / 2 - offsetImage
-    val centerY = canvasElem.height.toDouble / 2 - offsetImage
-    val radius = Math.min(centerX * 1.5, centerY * 1.5) / 2
+    val canvasWidth = canvasElem.width.toDouble
+    val canvasHeight = canvasElem.height.toDouble
+    val centerX = canvasWidth / 2 - offsetImage
+    val centerY = canvasHeight / 2 - offsetImage
 
     // return if the peer is not yet connected. Also show hint to connect
     if (peersSize == 0) {
-      ctx.font = "20px sans-serif"
-      ctx.clearRect(0, 0, canvasElem.width.toDouble, canvasElem.height.toDouble)
-      ctx.fillText("Please connect to a peer", centerX - offsetImage, centerY + offsetImage, imageSize * 5)
+      showHintText("Please connect to a peer", canvasWidth, canvasHeight, centerX - offsetImage, centerY + offsetImage, imageSize * 5)
       return
     }
 
-    val distanceBetweenPeers: Int = 360 / peersSize
+    criticalConnections()
+    criticalPairs.foreach(pair => println(s"critical edge = ${pair.left} -- ${pair.right}"))
 
-    // Create new Peer object from each unique IDs
-    val peers: Map[String, Peer] = uniqueIds.toList.sorted.zipWithIndex.map((id, index) => {
-      id -> Peer(id, centerX + radius * sin(toRadians(distanceBetweenPeers * index)), centerY + radius * cos(toRadians(distanceBetweenPeers * index)))
-    }).toMap
+    val peers: Map[String, Peer] = calculatePeerPosition(canvasWidth, canvasHeight, centerX, centerY)
+
+    if(peers.isEmpty){
+      showHintText("Something is not right, please check console", canvasWidth, canvasHeight, centerX - offsetImage, centerY + offsetImage, imageSize * 5)
+      return
+    }
 
     // do the drawing after image has been loaded
     val image = document.createElement("img").asInstanceOf[Image]
@@ -117,7 +173,7 @@ class DrawNetwork(val pairs: Set[PeerPair], val canvasElem: Canvas, val divCanva
     image.onload = (e: dom.Event) => {
 
       // reset the canvas
-      ctx.clearRect(0, 0, canvasElem.width.toDouble, canvasElem.height.toDouble)
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight.toDouble)
 
       // Make the connection lines
       ctx.lineWidth = 3
@@ -139,5 +195,11 @@ class DrawNetwork(val pairs: Set[PeerPair], val canvasElem: Canvas, val divCanva
         ctx.fillText(peerText, peer.x, peer.y, imageSize * 5)
       })
     }
+  }
+
+  private def showHintText(text: String, canvasWidth: Double, canvasHeight: Double, textPosX: Double, textPosY: Double, maxWidth: Double): Unit = {
+    ctx.font = "20px sans-serif"
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight)
+    ctx.fillText(text, textPosX, textPosY, maxWidth)
   }
 }
