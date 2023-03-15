@@ -13,6 +13,7 @@ import rescala.extra.distribution.Network
 import kofre.dotted.Dotted
 import loci.serializer.jsoniterScala.given
 import rescala.extra.Tags.SignalTagListToScalatags
+import scalatags.JsDom.tags2.nav
 
 import scala.math.*
 
@@ -34,33 +35,50 @@ object WebApp {
     //
 
     val canvasElem = canvas(
-      border := "1px solid black",
+//      border := "1px solid black",
       width := "100%",
       height := "100%",
     ).render
 
-    val divWebRTC = div(
-      `class` := "row",
-      WebRTCHandling(registry).webrtcHandlingArea.render
-    ).render
+    val divWebRTC = WebRTCHandling(registry).webrtcHandlingArea.render
 
     val divCanvas = div(
-      `class` := "row",
+      `class` := "container",
       div(
         `class` := "col",
         canvasElem,
       )
     ).render
 
+    val divAlert = div().render
+
     val gridElem = div(
       `class` := "container",
+      style := "margin-top: 5rem",
       divWebRTC,
-      p(s"Peer ID = $peerId"),
+      divAlert,
       divCanvas
     ).render
 
+    val navBar = nav(
+      `class` := "navbar  fixed-top navbar-dark bg-primary mb-2",
+      div(
+        `class` := "container-fluid",
+        span(
+          `class` := "navbar-brand mb-0 h1",
+          "P2P Real-Time"
+        ),
+        span(
+          `class` := "navbar-brand mb-0",
+          s"Peer ID = $peerId"
+        )
+      )
+    ).render
+
+
     val ctx = canvasElem.getContext("2d").asInstanceOf[CanvasRenderingContext2D]
 
+    document.body.appendChild(navBar)
     document.body.appendChild(gridElem)
 
     //
@@ -131,6 +149,7 @@ object WebApp {
       //        })
       //      }
 
+      updateAlert(peerPairsInCluster, divAlert);
       DrawNetwork(peerPairsInCluster, canvasElem, divCanvas, ctx).draw();
     }
 
@@ -229,6 +248,18 @@ object WebApp {
       val nextString: String = if (id == pp.left) pp.right else pp.left
       findPeersInTheSameCluster(idSet, nextString, peerPairs)
     })
+  }
+
+  def updateAlert(peerPairs: Set[PeerPair], div: Div): Unit = {
+    if(peerPairs.isEmpty){
+      div.textContent = "Your peer is not connected to any other peer. Please connect it to a peer, to show the network..."
+      div.className = "alert alert-warning text-center"
+      div.style = "margin-top: 15rem"
+    } else {
+      div.textContent = ""
+      div.className = ""
+      div.style = ""
+    }
   }
 
   

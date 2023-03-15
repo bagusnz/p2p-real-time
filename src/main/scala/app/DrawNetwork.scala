@@ -213,7 +213,7 @@ class DrawNetwork(val pairs: Set[PeerPair], val canvasElem: Canvas, val divCanva
 
     // return if the peer is not yet connected. Also show hint to connect
     if (peersSize == 0) {
-      showHintText("Please connect to a peer", canvasWidth, canvasHeight, centerX - offsetImage, centerY + offsetImage, imageSize * 5)
+//      showHintText("Please connect to a peer", canvasWidth, canvasHeight, centerX - offsetImage, centerY + offsetImage, imageSize * 5)
       return
     }
 
@@ -237,7 +237,7 @@ class DrawNetwork(val pairs: Set[PeerPair], val canvasElem: Canvas, val divCanva
 
       // Make the connection lines
       ctx.lineWidth = 3
-      ctx.strokeStyle = "green"
+      ctx.strokeStyle = "blue"
       ctx.font = "14px sans-serif"
       ctx.beginPath()
       pairs.foreach(pair => {

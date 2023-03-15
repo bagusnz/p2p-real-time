@@ -21,7 +21,7 @@ case class WebRTCHandling(registry: Registry) {
 
   def webrtcHandlingArea: Tag = {
 
-    val renderedTa  = textarea().render
+    val renderedTa  = textarea(`class` := "form-control", `placeholder` := "Copy the generated text from other browser here...").render
     val renderedPre = pre().render
 
     var pendingServer: Option[PendingConnection] = None
@@ -38,7 +38,9 @@ case class WebRTCHandling(registry: Registry) {
     }
 
     val hb = button(
-      "host",
+      `type` := "button",
+      `class` := "btn btn-outline-primary form-control",
+      "HOST",
       onclick := { (uie: UIEvent) =>
         val res = webrtcIntermediate(WebRTC.offer())
 //        println(res.session)
@@ -55,7 +57,9 @@ case class WebRTCHandling(registry: Registry) {
     )
 
     val cb = button(
-      "connect",
+      `type` := "button",
+      `class` := "btn btn-outline-primary form-control",
+      "CONNECT",
       onclick := { (uie: UIEvent) =>
         val cs = readFromString(renderedTa.value)(codec)
         val connector = pendingServer match {
@@ -78,7 +82,15 @@ case class WebRTCHandling(registry: Registry) {
       }
     )
 
-    section(hb, cb, renderedPre, renderedTa)
+    div(
+      div(
+        `class` := "row mb-3",
+        div(`class` := "col", hb),
+        div(`class` := "col", cb),
+      ),
+      renderedPre,
+      renderedTa
+    )
   }
 
   case class PendingConnection(connector: WebRTC.Connector, session: Future[WebRTC.CompleteSession])
